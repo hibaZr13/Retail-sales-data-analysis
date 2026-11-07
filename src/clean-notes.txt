@@ -1,0 +1,110 @@
+"""
+cleaning process
+-   make copy of orginal data that will be cleaned and keep original data intact
+
+purchases and invoice_items tables:
+-   delete exact row duplicates
+-   record the number of rows deleted from each table 
+
+invoice_items table:
+- 	Same invoice + same product, different quantity -> flag
+- 	Same invoice + same product, same quantity + different price -> flag
+- 	Same invoice + same product, different quantity + different price -> glag
+-   flag Zero and near-zero prices
+
+purchases table:
+-   Same invoice + same product, different quantity -> flag
+-   turn date from string to datetime object
+
+products table:
+-   standerdize and fix inconsistent category labels:
+    - combine similar categories into one category
+    - fix different formating and writing errors (Uppercase/lowercase differences, Leading and trailing spaces, Multiple spaces between words)
+    - do a check on products based on keywords and add a new column for those that may look like are incorrect called "proposed category"
+-   
+
+
+
+-   at the end, compare cleaned data with original data
+"""
+
+
+
+
+
+"""
+----------------------- category info:
+
+## 1. Recommended final categories
+
+| Final category         | Existing categories to merge                   | Definition                                                             |
+| ---------------------- | ---------------------------------------------- | ---------------------------------------------------------------------- |
+| Home Decor             | Home Decor                                     | Decorative objects and accessories for the home                        |
+| Kitchen & Dining       | Kitchen & Dining + Kitchen                     | Kitchenware, tableware, cookware and dining accessories                |
+| Party & Festive        | Party & Festive + Seasonal                     | Decorations and supplies for celebrations and events                   |
+| Toys & Games           | Toys & Games                                   | Toys, dolls, games, puzzles and children's play products               |
+| Stationery & Craft     | Stationery & Craft                             | Paper products, cards, notebooks, writing and craft supplies           |
+| Apparel & Accessories  | Apparel & Accessories                          | Jewellery, bags, purses, hair accessories and wearable accessories     |
+| Garden & Outdoor       | Garden & Outdoor + Gardening                   | Gardening supplies, plants, outdoor decorations and accessories        |
+| Personal Care & Beauty | Health, Beauty & Personal Care + Personal Care | Cosmetics, skincare, toiletries and personal hygiene products          |
+| Cleaning & Household   | Cleaning & Hygiene + Household                 | Cleaning products, detergents and household consumables                |
+| DIY & Tools            | DIY & Tools                                    | Tools, measuring equipment, repair and maintenance supplies            |
+| Produce                | Produce                                        | Fresh and packaged fruits and vegetables                               |
+| Dairy                  | Dairy                                          | Milk, cheese, butter, yoghurt and other dairy products                 |
+| Beverages              | Beverages                                      | Water, soft drinks, coffee, tea and alcoholic beverages                |
+| Bakery & Snacks        | Bakery & Snacks                                | Bread, pastries, cakes, biscuits and snack products                    |
+| Meat                   | Meat                                           | Meat, poultry, sausages and meat-based products                        |
+| Condiments & Spices    | Condiments & Spices                            | Sauces, seasonings, spices, honey, jam and dressings                   |
+| Pantry                 | Pantry                                         | Dry and packaged food staples such as rice, pasta, flour and oil       |
+| Pet Care               | Pet Care                                       | Pet food and animal-care products                                      |
+| Miscellaneous          | Miscellaneous                                  | Products that cannot confidently be assigned elsewhere                 |
+| Non-merchandise        | Administrative                                 | Postage, carriage, bank charges and other administrative invoice items |
+
+
+## 2. Keyword rules for classification
+
+These are the keywords I'd start with. They are indicative, not absolute: some words are ambiguous and should not independently determine a category.
+
+| Category               | Useful keywords                                                                                                                                                      |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Home Decor             | `wall`, `mirror`, `frame`, `clock`, `candle`, `holder`, `lamp`, `lampshade`, `vase`, `ornament`, `photo`, `sign`, `heart`, `flower`, `hanging`                       |
+| Kitchen & Dining       | `mug`, `cup`, `glass`, `bowl`, `plate`, `tray`, `cutlery`, `spoon`, `fork`, `knife`, `jar`, `teapot`, `kettle`, `cake`, `baking`, `cookware`, `utensil`, `tea towel` |
+| Party & Festive        | `party`, `garland`, `bunting`, `ribbon`, `balloon`, `decoration`, `honeycomb`, `confetti`, `banner`, `halloween`, `christmas`, `easter`, `birthday`, `wedding`       |
+| Toys & Games           | `toy`, `doll`, `dolly`, `jigsaw`, `puzzle`, `playing cards`, `game`, `dinosaur`, `childrens`, `child's`, `kids`, `soft toy`, `teddy`                                 |
+| Stationery & Craft     | `notebook`, `paper`, `card`, `greeting`, `pencil`, `pen`, `envelope`, `sticker`, `craft`, `wrapping`, `gift wrap`, `book`, `stamp`                                   |
+| Apparel & Accessories  | `necklace`, `earrings`, `bracelet`, `ring`, `purse`, `handbag`, `scarf`, `hair`, `charm`, `brooch`, `keyring`, `bag`                                                 |
+| Garden & Outdoor       | `garden`, `watering`, `plant`, `seed`, `soil`, `fertilizer`, `parasol`, `picnic`, `bird feeder`, `plant pot`, `toadstool`, `herb`                                    |
+| Personal Care & Beauty | `soap`, `shampoo`, `cosmetics`, `makeup`, `skin`, `beauty`, `perfume`, `deodorant`, `moisturiser`, `toothbrush`, `toothpaste`, `sanitary`, `hair spray`              |
+| Cleaning & Household   | `cleaner`, `detergent`, `softener`, `decalcifier`, `abrasive`, `dishwashing`, `cling film`, `bin bag`, `napkin`, `tissue`, `washing`, `disinfectant`                 |
+| DIY & Tools            | `screwdriver`, `spirit level`, `tape measure`, `drill`, `screw`, `hammer`, `tool`, `repair`                                                                          |
+| Produce                | `fruit`, `vegetable`, `grapes`, `citrus`, `berries`, `potato`, `onion`, `tomato`, `carrot`, `apple`                                                                  |
+| Dairy                  | `milk`, `cheese`, `butter`, `yogurt`, `cream`, `curd`, `whipped`, `sour cream`                                                                                       |
+| Beverages              | `wine`, `beer`, `coffee`, `tea`, `water`, `soda`, `juice`, `prosecco`, `whisky`, `brandy`, `cocoa`                                                                   |
+| Bakery & Snacks        | `bread`, `cake`, `waffle`, `biscuit`, `cookie`, `pastry`, `roll`, `bun`, `snack`, `cereal`, `dessert`                                                                |
+| Meat                   | `meat`, `sausage`, `chicken`, `beef`, `pork`, `ham`, `bacon`, `hamburger`, `liver`                                                                                   |
+| Condiments & Spices    | `sauce`, `honey`, `mustard`, `vinegar`, `jam`, `syrup`, `salt`, `spice`, `ketchup`, `dressing`, `seasoning`                                                          |
+| Pantry                 | `oil`, `flour`, `rice`, `pasta`, `lentils`, `beans`, `sugar`                                                                                                         |
+| Pet Care               | `pet`, `dog food`, `cat food`, `animal food`, `pet care`                                                                                                             |
+
+## 3. Important rules for ambiguous keywords
+
+Some of your most frequent keywords appear in multiple categories. Don't classify them in isolation.
+
+| Keyword  | Why it is ambiguous                                    |
+| -------- | ------------------------------------------------------ |
+| `bag`    | Handbag, gift bag, shopping bag or food packaging      |
+| `candle` | Home decoration or festive decoration                  |
+| `tea`    | Tea beverage, tea set or tea towel                     |
+| `bottle` | Water bottle, cosmetic bottle or decorative bottle     |
+| `heart`  | Jewellery, decoration or festive item                  |
+| `box`    | Storage box, gift box or food packaging                |
+| `flower` | Garden plant, jewellery or home decoration             |
+| `holder` | Candle holder, kitchen holder or decorative holder     |
+| `light`  | Lighting equipment or decorative lighting              |
+| `paper`  | Stationery, wrapping paper or household paper products |
+| `gift`   | Gift wrapping, gift box or an actual gift product      |
+
+For these, use the complete product description and, if necessary, manual review.
+
+
+"""
